@@ -1,0 +1,226 @@
+// Faz'aa — PostgreSQL schema (Prisma)
+// Conventions:
+//   - UUIDv7 primary keys (time-ordered → B-tree friendly; requires Prisma ≥ 5.19)
+//   - timestamptz everywhere (never store timestamps without a time zone)
+//   - Capacity is DERIVED from TaskAssignment rows — never denormalize a counter
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // runtime — Supabase transaction pooler (pgbouncer=true)
+  directUrl = env("DIRECT_DATABASE_URL") // CLI/migrations — Supabase session pooler
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────
+
+enum Role {
+  VOLUNTEER
+  ORGANIZER
+  ADMIN
+}
+
+enum EventCategory {
+  SPORTS
+  MARATHON
+  CLEANUP
+  COMMUNITY
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+// How a task fills its slots
+enum TaskMode {
+  INSTANT_CLAIM // volunteer clicks "I'm ready" → confirmed immediately
+  APPROVAL      // volunteer applies → organizer approves
+}
+
+enum TaskStatus {
+  OPEN
+  CLOSED    // organizer stopped accepting (manually or event cancelled)
+  COMPLETED
+}
+
+enum AssignmentStatus {
+  PENDING   // applied, waiting for organizer (APPROVAL mode)
+  CONFIRMED // claimed instantly or approved → occupies a slot
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid(7))
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String?
+  role         Role     @default(VOLUNTEER)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  organizerProfile OrganizerProfile?
+  organizedEvents  Event[]           @relation("EventOrganizer")
+  assignments      TaskAssignment[]
+  verificationDocuments VerificationDocument[] @relation("VerificationDocuments")
+  preferredCity    City?             @relation(fields: [preferredCityId], references: [id], onDelete: SetNull)
+  preferredCityId  String?
+}
+
+// Organization details for ORGANIZER accounts — kept out of User on purpose,
+// so the auth table stays lean and org branding/verification evolves freely.
+model OrganizerProfile {
+  id         String  @id @default(uuid(7))
+  userId     String  @unique
+  orgName    String
+  bio        String?
+  logoUrl    String?
+  websiteUrl String?
+  isVerified Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id            String        @id @default(uuid(7))
+  organizerId   String
+  title         String
+  slug          String        @unique
+  description   String
+  category      EventCategory @default(OTHER)
+  status        EventStatus   @default(DRAFT)
+  city          String? // display string — legacy rows and denormalized from City.name
+  cityId        String?
+  districtId    String?
+  location      String? // human-readable venue / meeting point
+  startsAt      DateTime      @db.Timestamptz(6)
+  endsAt        DateTime?     @db.Timestamptz(6)
+  coverImageUrl String?
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(6)
+
+  organizer User      @relation("EventOrganizer", fields: [organizerId], references: [id])
+  cityObj   City?     @relation(fields: [cityId], references: [id])
+  district  District? @relation(fields: [districtId], references: [id])
+  tasks     Task[]
+
+  // Hot query: "browse PUBLISHED events, soonest first"
+  @@index([status, startsAt])
+  @@index([organizerId]) // organizer dashboard: "my events"
+  @@index([cityId]) // browse by Jordan city
+  @@index([districtId])
+}
+
+model Task {
+  id                 String     @id @default(uuid(7))
+  eventId            String
+  title              String
+  description        String?
+  requiredVolunteers Int        @default(1)
+  mode               TaskMode   @default(INSTANT_CLAIM)
+  status             TaskStatus @default(OPEN)
+  startsAt           DateTime?  @db.Timestamptz(6) // optional; falls back to event window
+  endsAt             DateTime?  @db.Timestamptz(6)
+  createdAt          DateTime   @default(now()) @db.Timestamptz(6)
+
+  event       Event            @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignments TaskAssignment[]
+
+  @@index([eventId, status]) // event detail page + organizer dashboard rollups
+}
+
+// The signup itself — source of truth for capacity. One row per volunteer per task.
+model TaskAssignment {
+  id          String           @id @default(uuid(7))
+  taskId      String
+  volunteerId String
+  status      AssignmentStatus @default(PENDING)
+  note        String? // optional message to the organizer
+  createdAt   DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @db.Timestamptz(6)
+
+  task      Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  volunteer User @relation(fields: [volunteerId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, volunteerId]) // a volunteer can't apply twice
+  @@index([volunteerId, status]) // volunteer dashboard: "my activities"
+}
+
+// ─── Organizer verification ───────────────────────────────────────────────
+
+enum VerificationDocumentType {
+  NGO_LICENSE
+  OFFICIAL_ID
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// A license/ID document an organizer uploads; an ADMIN reviews it and flips
+// OrganizerProfile.isVerified. Capacity of trust lives on the profile, the
+// documents are the audit trail.
+model VerificationDocument {
+  id              String                   @id @default(uuid(7))
+  organizerId     String
+  documentType    VerificationDocumentType
+  fileName        String
+  fileSize        Int
+  mimeType        String
+  fileUrl         String
+  fileKey         String? // UploadThing key (or local storage key)
+  status          VerificationStatus       @default(PENDING)
+  rejectionReason String?
+  reviewedAt      DateTime?                @db.Timestamptz(6)
+  reviewedBy      String?
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime                 @updatedAt @db.Timestamptz(6)
+
+  organizer User @relation("VerificationDocuments", fields: [organizerId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt]) // admin review queue, oldest first
+  @@index([organizerId]) // "my documents"
+}
+
+// ─── Jordan locations ─────────────────────────────────────────────────────
+
+// The 12 governorates. `city` on Event stays as a display string for legacy
+// rows; new events denormalize City.name into it on write.
+model City {
+  id      String  @id @default(uuid(7))
+  name    String  @unique // "Amman"
+  arabic  String  // "عمّان"
+  events  Event[]
+  districts District[]
+  preferredByUsers User[]
+
+  @@map("cities")
+}
+
+model District {
+  id        String   @id @default(uuid(7))
+  name      String   // "Al Abdali"
+  arabic    String   // "العبدلي"
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  events    Event[]
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([name, cityId])
+  @@index([cityId])
+  @@map("districts")
+}
