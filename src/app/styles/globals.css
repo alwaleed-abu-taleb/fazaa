@@ -1,0 +1,254 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./design-tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Faz'aa semantic layer (shadcn/ui tokens) — re-skinned to the Jordanian
+   palette. Names are unchanged so every component in components/ui keeps
+   working; only the values now point at design-tokens.css. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Radius: 6px inputs / 8px cards (design-tokens.css) */
+  --radius-sm: var(--radius-input);
+  --radius-md: var(--radius-input);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-card);
+}
+
+/* --- Light --------------------------------------------------------------- */
+:root {
+  --radius: var(--radius-card);
+  --background: var(--white);
+  --foreground: var(--slate-dark);
+  --card: var(--white);
+  --card-foreground: var(--slate-dark);
+  --popover: var(--white);
+  --popover-foreground: var(--slate-dark);
+
+  /* Petra Crimson drives every primary action */
+  --primary: var(--crimson);
+  --primary-foreground: var(--crimson-foreground);
+
+  --secondary: var(--gray-light);
+  --secondary-foreground: var(--gray-dark);
+  --muted: var(--gray-light);
+  /* gray-dark (10.3:1), NOT gray-medium — medium gray fails AA on white */
+  --muted-foreground: var(--gray-dark);
+
+  /* Wadi Rum Sand for subtle accents */
+  --accent: var(--sand);
+  --accent-foreground: var(--sand-foreground);
+
+  --destructive: var(--crimson);
+  --destructive-foreground: var(--crimson-foreground);
+
+  /* gray-light for decorative separators; interactive borders use --input */
+  --border: var(--gray-light);
+  --input: var(--gray-medium);
+  /* Dead Sea Blue focus ring — 5.6:1, satisfies WCAG 1.4.11 */
+  --ring: var(--dead-sea);
+}
+
+/* --- Dark (Slate Dark surfaces, brand preserved) ------------------------- */
+.dark {
+  --background: #0f172a;
+  --foreground: var(--gray-light);
+  --card: var(--slate-dark); /* ≈ #1e293b — matches popover.tsx/select.tsx */
+  --card-foreground: var(--gray-light);
+  --popover: var(--slate-dark);
+  --popover-foreground: var(--gray-light);
+  --primary: var(--crimson);
+  --primary-foreground: var(--crimson-foreground);
+  --secondary: #334155;
+  --secondary-foreground: var(--gray-light);
+  --muted: var(--slate-dark);
+  /* gray-medium on slate-dark ≈ 5:1 — AA pass */
+  --muted-foreground: var(--gray-medium);
+  /* Darker than the card so hover/highlight states read clearly */
+  --accent: #0f172a;
+  --accent-foreground: var(--gray-light);
+  --destructive: var(--crimson);
+  --destructive-foreground: var(--crimson-foreground);
+  --border: #334155;
+  --input: #334155;
+  --ring: var(--dead-sea);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: var(--text-body--line-height);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Mobile-first type scale: headings step up at md. */
+  h1 {
+    @apply text-h2;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    @apply text-h3;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    @apply text-h3;
+    font-weight: 600;
+  }
+  h4,
+  h5,
+  h6 {
+    @apply text-body;
+    font-weight: 600;
+  }
+  p {
+    @apply text-body;
+  }
+  small {
+    @apply text-caption;
+  }
+  code,
+  kbd,
+  samp,
+  pre {
+    font-family: var(--font-mono);
+    font-size: var(--text-mono);
+  }
+
+  @media (min-width: 768px) {
+    h1 {
+      @apply text-h1;
+    }
+    h2 {
+      @apply text-h2;
+    }
+  }
+
+  /* RTL: Arabic layout direction is set on <html dir="rtl">; logical
+     properties (ps/pe/ms/me) in components do the rest. */
+  html[dir="rtl"] {
+    direction: rtl;
+  }
+}
+
+/* --- Reusable flat utilities -------------------------------------------- */
+@layer components {
+  /* Page width + 8px-grid gutters */
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-md sm:px-lg;
+  }
+
+  /* Flat card: 8px radius, hairline border, single subtle shadow */
+  .card-flat {
+    @apply rounded-card border border-border bg-card shadow-subtle;
+  }
+
+  /* Flat input: 6px radius, transparent fill */
+  .input-flat {
+    @apply rounded-input border border-input bg-transparent text-foreground outline-none;
+  }
+  .input-flat:focus-visible {
+    @apply border-ring outline-none ring-2 ring-ring/40;
+  }
+
+  /* Dead Sea Blue inline link */
+  .link-dead-sea {
+    @apply font-medium text-dead-sea underline-offset-2 transition-colors hover:text-crimson;
+  }
+
+  /* Role badges — Petra Gold = organizer, Dead Sea Blue = volunteer */
+  .badge-organizer {
+    @apply inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-caption font-medium text-gold-foreground;
+  }
+  .badge-volunteer {
+    @apply inline-flex items-center gap-1 rounded-full bg-dead-sea px-2 py-0.5 text-caption font-medium text-dead-sea-foreground;
+  }
+}
+
+/* Applied for ~350ms while the theme toggles so the switch animates smoothly
+   without leaving every element on a permanent color transition. */
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    color 200ms ease,
+    fill 200ms ease,
+    stroke 200ms ease !important;
+}
+
+/* Indeterminate upload progress bar (server actions don't expose progress events) */
+@keyframes upload-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+/* ─── Dark mode: dropdowns, popovers, tooltips ─────────────────────────────
+   Radix portals mount under <body> (inside html.dark), so tokens apply — but
+   these rules guarantee it even if a component misses its token classes. */
+.dark select {
+  color-scheme: dark;
+}
+.dark select option,
+.dark select optgroup {
+  background-color: var(--slate-dark);
+  color: var(--gray-light);
+}
+.dark [role="listbox"],
+.dark [role="tooltip"],
+.dark [data-slot="select-content"],
+.dark [data-slot="popover-content"],
+.dark [data-slot="dropdown-menu-content"] {
+  background-color: var(--slate-dark);
+  color: var(--gray-light);
+  border-color: #334155;
+}
+.dark [role="option"],
+.dark [role="menuitem"] {
+  color: var(--gray-light);
+}
+.dark [role="option"][data-highlighted],
+.dark [role="option"][data-focused],
+.dark [role="menuitem"][data-highlighted],
+.dark [role="menuitem"][data-focused] {
+  background-color: #0f172a;
+  color: var(--gray-light);
+}

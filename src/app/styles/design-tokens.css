@@ -1,0 +1,155 @@
+/* ==========================================================================
+   Faz'aa (فزعة) — Design Tokens
+   Flat · functional · no gradients · 8px grid · Arabic-first · WCAG 2.1 AA
+   Single source of truth for the whole design system.
+   ========================================================================== */
+
+/* --- Brand palette ------------------------------------------------------- */
+:root {
+  /* Primary — Petra Crimson: primary actions, headers */
+  --crimson: #9e2a2b;
+  --crimson-foreground: #ffffff; /* 6.4:1 on crimson — AA pass */
+
+  /* Secondary — Dead Sea Blue: secondary, links, borders */
+  --dead-sea: #1e6b7e;
+  --dead-sea-foreground: #ffffff; /* 5.6:1 on dead-sea — AA pass */
+
+  /* Background — Wadi Rum Sand: backgrounds, subtle accents */
+  --sand: #d4b199;
+  --sand-foreground: #1f2937; /* 7:1 on sand — AA pass */
+
+  /* Accent — Petra Gold: CTAs, organizer badge.
+     #E0A96D on white is ~2.1:1, so gold is NEVER body text on light —
+     it is a fill with a dark foreground, a border, or large text only. */
+  --gold: #e0a96d;
+  --gold-foreground: #1f2937;
+
+  /* Accent — Growth Green: success states, volunteer badge */
+  --growth: #2a6f97;
+  --growth-foreground: #ffffff; /* 5.6:1 on growth — AA pass */
+
+  /* Slate Dark — text, dark-mode surfaces */
+  --slate-dark: #1f2937;
+
+  /* Neutrals */
+  --white: #ffffff;
+  --gray-light: #f3f4f6; /* secondary backgrounds */
+  --gray-medium: #9ca3af; /* disabled text ONLY (3.9:1 on white fails AA) */
+  --gray-dark: #374151; /* body text (10.3:1 on white — AA pass) */
+
+  /* --- Spacing — 8px baseline ------------------------------------------- */
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
+
+  /* --- Typography -------------------------------------------------------- */
+  --text-h1: 32px;
+  --text-h1--line-height: 40px;
+  --text-h2: 24px;
+  --text-h2--line-height: 32px;
+  --text-h3: 18px;
+  --text-h3--line-height: 24px;
+  --text-body: 14px;
+  --text-body--line-height: 16px;
+  --text-caption: 12px;
+  --text-caption--line-height: 14px;
+  --text-mono: 12px;
+  --text-mono--line-height: 16px;
+
+  /* --- Radius ------------------------------------------------------------ */
+  --radius-input: 6px;
+  --radius-card: 8px;
+
+  /* --- Shadow — subtle only --------------------------------------------- */
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  /* --- Fonts — Arabic-first system stack -------------------------------- */
+  --font-sans:
+    "Segoe UI", "Tahoma", "Noto Kufi Arabic", "Noto Naskh Arabic", system-ui,
+    -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "Cascadia Mono", "Segoe UI Mono", "Consolas",
+    "DejaVu Sans Mono", monospace;
+}
+
+/* ==========================================================================
+   Tailwind v4 theme bridge (`@theme inline`).
+   `inline` makes each utility resolve directly to the token var above without
+   re-declaring it, so there is exactly one source of truth and the values stay
+   theme-switchable at runtime. Generated utilities: bg-crimson, text-h1,
+   p-md, rounded-card, shadow-subtle, font-sans, …
+   The theme-switchable shadcn semantic layer (primary/card/border/…) lives in
+   globals.css and builds on these.
+   ========================================================================== */
+@theme inline {
+  /* Brand colors */
+  --color-crimson: var(--crimson);
+  --color-crimson-foreground: var(--crimson-foreground);
+  --color-dead-sea: var(--dead-sea);
+  --color-dead-sea-foreground: var(--dead-sea-foreground);
+  --color-sand: var(--sand);
+  --color-sand-foreground: var(--sand-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-growth: var(--growth);
+  --color-growth-foreground: var(--growth-foreground);
+  --color-slate-dark: var(--slate-dark);
+
+  /* Neutrals */
+  --color-white: var(--white);
+  --color-gray-light: var(--gray-light);
+  --color-gray-medium: var(--gray-medium);
+  --color-gray-dark: var(--gray-dark);
+
+  /* Spacing */
+  --spacing-xs: var(--spacing-xs);
+  --spacing-sm: var(--spacing-sm);
+  --spacing-md: var(--spacing-md);
+  --spacing-lg: var(--spacing-lg);
+  --spacing-xl: var(--spacing-xl);
+  --spacing-2xl: var(--spacing-2xl);
+
+  /* Container scale. NOTE: in Tailwind v4 `max-w-*` resolves the theme keys
+     ["--max-width", "--spacing", "--container"] *in that order*. Because the
+     named spacing keys above (--spacing-md, --spacing-lg, …) are defined,
+     `max-w-md`/`max-w-lg`/… resolve against the *spacing* scale (16/24/32px)
+     instead of this container scale, collapsing page-width containers to
+     padding-sized widths. Re-declaring the container scale here does NOT fix
+     it, so page-width containers use explicit arbitrary values
+     (max-w-[28rem], max-w-[36rem], …) instead. --container-4xl/5xl/6xl have
+     no named spacing counterpart, so max-w-4xl…max-w-6xl are unaffected. */
+  --container-sm: 24rem;
+  --container-md: 28rem;
+  --container-lg: 32rem;
+  --container-xl: 36rem;
+  --container-2xl: 42rem;
+  --container-3xl: 48rem;
+
+  /* Typography */
+  --text-h1: var(--text-h1);
+  --text-h1--line-height: var(--text-h1--line-height);
+  --text-h2: var(--text-h2);
+  --text-h2--line-height: var(--text-h2--line-height);
+  --text-h3: var(--text-h3);
+  --text-h3--line-height: var(--text-h3--line-height);
+  --text-body: var(--text-body);
+  --text-body--line-height: var(--text-body--line-height);
+  --text-caption: var(--text-caption);
+  --text-caption--line-height: var(--text-caption--line-height);
+  --text-mono: var(--text-mono);
+  --text-mono--line-height: var(--text-mono--line-height);
+
+  /* Radius */
+  --radius-input: var(--radius-input);
+  --radius-card: var(--radius-card);
+
+  /* Shadow */
+  --shadow-subtle: var(--shadow-subtle);
+
+  /* Fonts */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}

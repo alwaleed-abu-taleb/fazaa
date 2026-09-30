@@ -7,7 +7,7 @@ import { getBrowseEvents } from "@/features/events/queries";
 import { getCitiesWithDistricts, getPreferredCity } from "@/features/locations/queries";
 import { getCurrentUser } from "@/server/auth";
 
-export const metadata: Metadata = { title: "Browse events" };
+export const metadata: Metadata = { title: "تصفح الأحداث" };
 
 export default async function EventsPage({
   searchParams,
@@ -39,13 +39,13 @@ export default async function EventsPage({
   ]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10">
+    <>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Volunteer events</h1>
+        <h1 className="text-3xl font-bold tracking-tight">أحداث التطوع</h1>
         <p className="mt-1 text-muted-foreground">
           {events.length > 0
-            ? `${events.length} upcoming event${events.length === 1 ? "" : "s"} looking for hands.`
-            : "Check back soon — new events are posted regularly."}
+            ? (events.length === 1 ? "حدث واحد قادم يحتاج مشاركتك" : `${events.length} حدث قادم يحتاج مشاركتك`)
+            : "تابعنا قريباً — تُضاف أحداث جديدة باستمرار"}
         </p>
       </div>
 
@@ -53,14 +53,14 @@ export default async function EventsPage({
         <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm">
           <MapPin className="size-4 text-primary" />
           <span>
-            Showing events in <span className="font-medium">{preferred.cityName}</span> first —
-            based on your preferred city.
+            نعرض أحداثاً في <span className="font-medium">{preferred.cityName}</span> أولاً —
+            بناءً على مدينتك المفضلة.
           </span>
           <Link
             href="/profile"
             className="font-medium text-primary underline-offset-4 hover:underline"
           >
-            Change
+            تغيير
           </Link>
         </div>
       )}
@@ -88,10 +88,10 @@ export default async function EventsPage({
       ) : (
         <div className="mt-8 rounded-lg border border-dashed p-12 text-center text-muted-foreground">
           {current.q || current.cityId || current.districtId || current.category
-            ? "No events match those filters — try widening your search."
-            : "No upcoming events yet. Organizers are cooking something up!"}
+            ? "لا توجد أحداث تطابق الفلاتر — جرّب توسيع البحث"
+            : "لا توجد أحداث قادمة بعد — المنظمون يعملون على شيء رائع!"}
         </div>
       )}
-    </div>
+    </>
   );
 }

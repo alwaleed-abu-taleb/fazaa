@@ -5,27 +5,39 @@ export const roleValues = ["VOLUNTEER", "ORGANIZER"] as const;
 
 export const registerSchema = z
   .object({
-    name: z.string().trim().min(2, "Name must be at least 2 characters").max(80),
-    email: z.string().trim().toLowerCase().email("Enter a valid email address"),
+    name: z.string().trim().min(2, "الاسم يجب أن يحتوي على حرفين على الأقل").max(80),
+    email: z.string().trim().toLowerCase().email("أدخل بريداً إلكترونياً صحيحاً"),
     phone: z.string().trim().min(1).max(30).optional(),
     role: z.enum(roleValues),
-    orgName: z.string().trim().min(2, "Organization name must be at least 2 characters").max(120).optional(),
-    password: z.string().min(8, "Password must be at least 8 characters").max(72),
+    orgName: z.string().trim().min(2, "اسم المنظمة يجب أن يحتوي على حرفين على الأقل").max(120).optional(),
+    password: z.string().min(8, "كلمة المرور يجب أن تحتوي على 8 أحرف على الأقل").max(72),
     confirmPassword: z.string(),
+    cityId: z.string().uuid("اختر المحافظة"),
+    districtId: z.string().uuid("اختر الناحية"),
+    terms: z.literal(true, { message: "يجب الموافقة على الشروط والأحكام" }),
   })
   .refine((d) => d.password === d.confirmPassword, {
-    message: "Passwords do not match",
+    message: "كلمتا المرور غير متطابقتين",
     path: ["confirmPassword"],
   })
   .refine((d) => d.role !== "ORGANIZER" || !!d.orgName, {
-    message: "Organization name is required for organizer accounts",
+    message: "اسم المنظمة مطلوب لحسابات المنظمين",
     path: ["orgName"],
   });
 
 export const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Enter a valid email address"),
-  password: z.string().min(1, "Enter your password"),
+  email: z.string().trim().toLowerCase().email("أدخل بريداً إلكترونياً صحيحاً"),
+  password: z.string().min(1, "أدخل كلمة المرور"),
+  remember: z.boolean().optional(),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().trim().toLowerCase().email("أدخل بريداً إلكترونياً صحيحاً"),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+/** Field-keyed errors for inline display next to each input. */
+export type FieldErrors = Partial<Record<string, string[]>>;

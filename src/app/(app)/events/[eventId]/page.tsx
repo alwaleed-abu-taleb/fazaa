@@ -39,7 +39,7 @@ export default async function EventDetailPage({
   const canSignup = user?.role === "VOLUNTEER" && acceptsSignups;
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10">
+    <div className="max-w-[56rem]">
       <Link
         href="/events"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"

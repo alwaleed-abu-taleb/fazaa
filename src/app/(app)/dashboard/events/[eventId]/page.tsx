@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Ban, Phone, Send, ShieldAlert, Users } from "lucide-react";
+import { Ban, Phone, Send, ShieldAlert, Users } from "lucide-react";
 import { AssignmentStatus, EventStatus } from "@prisma/client";
 import { getCurrentUser } from "@/server/auth";
 import { getEventTracker } from "@/features/dashboard/queries";
@@ -15,6 +15,7 @@ import { ApprovalButtons } from "@/features/dashboard/components/ApprovalButtons
 import { ExportButton } from "@/features/export/components/ExportButton";
 import { taskModeLabels } from "@/features/events/schemas";
 import { formatWindow } from "@/lib/format";
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -56,13 +57,13 @@ export default async function EventTrackerPage({
   );
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10">
-      <Link
-        href="/dashboard"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" /> Dashboard
-      </Link>
+    <div className="max-w-[64rem]">
+      <Breadcrumb
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: event.title },
+        ]}
+      />
 
       <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-2">

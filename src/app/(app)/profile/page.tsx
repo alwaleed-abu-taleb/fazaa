@@ -32,7 +32,7 @@ export default async function ProfilePage() {
   }));
 
   return (
-    <div className="mx-auto w-full max-w-xl px-4 py-10">
+    <div className="max-w-[36rem]">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-3">

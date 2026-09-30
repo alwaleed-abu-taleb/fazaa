@@ -1,220 +1,391 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, ClipboardList, MapPin, Plus, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, Plus, Users } from "lucide-react";
 import { AssignmentStatus, EventStatus } from "@prisma/client";
 import { getCurrentUser } from "@/server/auth";
-import { getOrganizerEvents, getVolunteerActivities } from "@/features/dashboard/queries";
+import {
+  getOrganizerEvents,
+  getVolunteerActivities,
+} from "@/features/dashboard/queries";
 import { getUserVerificationStatus } from "@/features/verification/queries";
-import { EventStatusBadge, CategoryBadge } from "@/features/events/components/badges";
+import { getPreferredCity } from "@/features/locations/queries";
+import { db } from "@/server/db";
+import { EventCard } from "@/features/events/components/EventCard";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShieldCheck } from "lucide-react";
+import { WelcomeBanner } from "@/features/dashboard/components/WelcomeBanner";
+import { StatCard } from "@/features/dashboard/components/StatCard";
+import { RoleProfile } from "@/features/dashboard/components/RoleProfile";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export const metadata: Metadata = { title: "لوحة التحكم" };
+
+const dateFmt = new Intl.DateTimeFormat("ar", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+const assignmentBadge: Record<AssignmentStatus, { label: string; className: string }> = {
+  PENDING: { label: "قيد المراجعة", className: "bg-gray-light text-gray-dark" },
+  CONFIRMED: { label: "مؤكد", className: "bg-gold text-gold-foreground" },
+  CANCELLED: { label: "ملغي", className: "bg-gray-light text-gray-dark" },
+  COMPLETED: { label: "مكتمل", className: "bg-growth/15 text-growth" },
+  NO_SHOW: { label: "لم يحضر", className: "bg-gray-light text-gray-dark" },
+};
 
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10">
-      <h1 className="text-3xl font-bold tracking-tight">
-        {user.role === "ORGANIZER" ? "Organizer dashboard" : "My activities"}
-      </h1>
-      <p className="mt-1 text-muted-foreground">
-        {user.role === "ORGANIZER"
-          ? "Track your events, fill rates and pending applications."
-          : "Everything you've signed up for, in one place."}
-      </p>
-
-      <div className="mt-8">
-        {user.role === "ORGANIZER" ? <OrganizerView userId={user.id} /> : <VolunteerView userId={user.id} />}
-      </div>
-    </div>
+  return user.role === "ORGANIZER" ? (
+    <OrganizerView userId={user.id} name={user.name} />
+  ) : (
+    <VolunteerView userId={user.id} name={user.name} />
   );
 }
 
-async function OrganizerView({ userId }: { userId: string }) {
-  const events = await getOrganizerEvents(userId);
-  const verification = await getUserVerificationStatus(userId);
-  const totals = events.reduce(
-    (acc, e) => ({
-      confirmed: acc.confirmed + e.slotsFilled,
-      pending: acc.pending + e.pendingCount,
-      live: acc.live + (e.status === EventStatus.PUBLISHED || e.status === EventStatus.ONGOING ? 1 : 0),
+async function OrganizerView({
+  userId,
+  name,
+}: {
+  userId: string;
+  name: string | null | undefined;
+}) {
+  const [events, verification, profile] = await Promise.all([
+    getOrganizerEvents(userId),
+    getUserVerificationStatus(userId),
+    db.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        organizerProfile: { select: { orgName: true, isVerified: true } },
+      },
     }),
-    { confirmed: 0, pending: 0, live: 0 },
-  );
+  ]);
+
+  const live = events.filter(
+    (e) => e.status === EventStatus.PUBLISHED || e.status === EventStatus.ONGOING,
+  ).length;
+  const confirmed = events.reduce((sum, e) => sum + e.slotsFilled, 0);
+  const pending = events.reduce((sum, e) => sum + e.pendingCount, 0);
 
   return (
     <div className="space-y-8">
+      <WelcomeBanner
+        name={name}
+        role="ORGANIZER"
+        subtitle={`لديك ${live} حدث نشط و ${confirmed} متطوع مسجل`}
+      />
+
       {!verification.isVerified && (
         <Alert>
-          <ShieldCheck className="size-4" />
-          <AlertTitle>Your organization isn&rsquo;t verified yet</AlertTitle>
+          <ShieldCheck className="size-4" aria-hidden="true" />
+          <AlertTitle>منظمتك لم تُوثَّق بعد</AlertTitle>
           <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-            <span>Organizers must be verified before they can publish events.</span>
+            <span>يجب توثيق المنظمة قبل نشر الأحداث.</span>
             <Button size="sm" variant="outline" asChild>
-              <Link href="/verify">Get verified</Link>
+              <Link href="/verify">توثيق المنظمة</Link>
             </Button>
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3">
-          <StatCard icon={ClipboardList} label="Live events" value={String(totals.live)} />
-          <StatCard icon={Users} label="Volunteers confirmed" value={String(totals.confirmed)} />
-          <StatCard icon={CalendarDays} label="Pending applications" value={String(totals.pending)} highlight={totals.pending > 0} />
-        </div>
-        <Button asChild>
-          <Link href="/events/new">
-            <Plus className="size-4" /> New event
-          </Link>
-        </Button>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard icon={ClipboardList} label="أحداث نشطة" value={String(live)} />
+        <StatCard icon={Users} label="متطوعون مسجلون" value={String(confirmed)} />
+        <StatCard
+          icon={CalendarDays}
+          label="طلبات قيد الانتظار"
+          value={String(pending)}
+          highlight={pending > 0}
+        />
       </div>
 
-      {events.length > 0 ? (
-        <ul className="divide-y rounded-lg border bg-card">
-          {events.map((e) => {
-            const pct = e.slotsNeeded > 0 ? Math.round((e.slotsFilled / e.slotsNeeded) * 100) : 0;
-            return (
-              <li key={e.id} className="p-4 sm:px-6">
-                <Link href={`/dashboard/events/${e.id}`} className="group block">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-medium group-hover:text-primary">{e.title}</span>
-                      <EventStatusBadge status={e.status} />
-                      {e.pendingCount > 0 && (
-                        <Badge className="bg-amber-500/15 text-amber-700 border-transparent hover:bg-amber-500/15">
-                          {e.pendingCount} pending approval{e.pendingCount === 1 ? "" : "s"}
-                        </Badge>
-                      )}
-                    </div>
-                    <span className="text-sm text-muted-foreground">
-                      {formatDate(e.startsAt)} · {e.city ?? "—"}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex items-center gap-3">
-                    <Progress value={pct} className="h-2 flex-1" />
-                    <span className="shrink-0 text-sm text-muted-foreground">
-                      {e.slotsFilled}/{e.slotsNeeded} slots · {e.taskCount} task{e.taskCount === 1 ? "" : "s"}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="rounded-lg border border-dashed p-12 text-center">
-          <p className="text-muted-foreground">You haven&rsquo;t created any events yet.</p>
-          <Button className="mt-4" variant="outline" asChild>
-            <Link href="/events/new">Create your first event</Link>
+      {/* My events */}
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-h2 font-semibold tracking-tight">أحدثي</h2>
+            <p className="mt-1 text-body text-muted-foreground">الأحداث التي أنشأتها</p>
+          </div>
+          <Button asChild size="sm">
+            <Link href="/events/new">
+              <Plus className="size-4" /> إنشاء حدث جديد
+            </Link>
           </Button>
         </div>
-      )}
-    </div>
-  );
-}
 
-async function VolunteerView({ userId }: { userId: string }) {
-  const { upcoming, past } = await getVolunteerActivities(userId);
-
-  return (
-    <div className="space-y-10">
-      <section>
-        <h2 className="text-lg font-semibold tracking-tight">Upcoming</h2>
-        {upcoming.length > 0 ? (
-          <ul className="mt-3 space-y-3">
-            {upcoming.map((a) => (
-              <ActivityRow key={a.id} assignment={a} />
+        {events.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {events.map((e) => (
+              <EventCard
+                key={e.id}
+                id={e.id}
+                title={e.title}
+                city={e.city}
+                category={e.category}
+                startsAt={e.startsAt}
+                organizerName={profile?.organizerProfile?.orgName ?? name ?? "—"}
+                organizerVerified={verification.isVerified}
+                slotsFilled={e.slotsFilled}
+                slotsNeeded={e.slotsNeeded}
+                status={e.status}
+                actions={
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/events/${e.id}`}>تعديل</Link>
+                  </Button>
+                }
+              />
             ))}
-          </ul>
+          </div>
         ) : (
-          <div className="mt-3 rounded-lg border border-dashed p-10 text-center">
-            <p className="text-muted-foreground">No upcoming sign-ups yet — someone out there needs a hand.</p>
+          <div className="rounded-card border border-dashed border-border p-12 text-center">
+            <p className="text-body text-muted-foreground">لم تنشئ أي حدث بعد.</p>
             <Button className="mt-4" variant="outline" asChild>
-              <Link href="/events">Browse events</Link>
+              <Link href="/events/new">أنشئ أول حدث</Link>
             </Button>
           </div>
         )}
       </section>
 
-      {past.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold tracking-tight">Past</h2>
-          <ul className="mt-3 space-y-3 opacity-75">
-            {past.map((a) => (
-              <ActivityRow key={a.id} assignment={a} />
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* Task management */}
+      <section>
+        <h2 className="mb-4 text-h2 font-semibold tracking-tight">إدارة المهام</h2>
+        <TaskManagement userId={userId} />
+      </section>
+
+      {/* Organizer profile */}
+      <section>
+        <h2 className="mb-4 text-h2 font-semibold tracking-tight">بيانات المنظم</h2>
+        <RoleProfile
+          name={name}
+          email={profile?.email ?? null}
+          role="ORGANIZER"
+          organization={profile?.organizerProfile?.orgName ?? null}
+          isVerified={profile?.organizerProfile?.isVerified}
+        />
+      </section>
     </div>
   );
 }
 
-type ActivityAssignment = Awaited<ReturnType<typeof getVolunteerActivities>>["upcoming"][number];
+async function TaskManagement({ userId }: { userId: string }) {
+  const events = await db.event.findMany({
+    where: { organizerId: userId },
+    select: {
+      id: true,
+      title: true,
+      tasks: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          assignments: {
+            where: { status: { in: [AssignmentStatus.PENDING, AssignmentStatus.CONFIRMED] } },
+            select: { id: true, status: true, volunteer: { select: { name: true } } },
+          },
+        },
+      },
+    },
+  });
 
-function ActivityRow({ assignment: a }: { assignment: ActivityAssignment }) {
+  const tasks = events.flatMap((e) =>
+    e.tasks.map((t) => ({
+      ...t,
+      eventTitle: e.title,
+      eventId: e.id,
+    })),
+  );
+
+  if (tasks.length === 0) {
+    return (
+      <div className="rounded-card border border-dashed border-border p-12 text-center">
+        <p className="text-body text-muted-foreground">لا توجد مهام بعد.</p>
+      </div>
+    );
+  }
+
   return (
-    <li>
-      <Link
-        href={`/events/${a.task.event.id}`}
-        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4 transition-colors hover:border-primary/40"
-      >
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">{a.task.event.title}</span>
-            <CategoryBadge category={a.task.event.category} />
-            {a.status === AssignmentStatus.CONFIRMED ? (
-              <Badge className="bg-primary/10 text-primary border-transparent hover:bg-primary/10">
-                Confirmed
-              </Badge>
-            ) : (
-              <Badge className="bg-amber-500/15 text-amber-700 border-transparent hover:bg-amber-500/15">
-                Awaiting approval
-              </Badge>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Task: {a.task.title} · by {a.task.event.organizer.name}
-          </p>
-        </div>
-        <span className="flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
-          <CalendarDays className="size-4" />
-          {formatDate(a.task.event.startsAt)}
-          {a.task.event.city ? ` · ${a.task.event.city}` : null}
-          <MapPin className="ml-1 hidden size-0" />
-        </span>
-      </Link>
-    </li>
+    <ul className="space-y-3">
+      {tasks.map((t) => {
+        const assignment = t.assignments[0];
+        const badge = assignment
+          ? assignmentBadge[assignment.status]
+          : null;
+        return (
+          <li
+            key={t.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-card p-3 transition-colors hover:bg-gray-light"
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-body font-semibold">{t.title}</h3>
+                {badge && (
+                  <span className={`rounded-full px-2 py-0.5 text-caption font-medium ${badge.className}`}>
+                    {badge.label}
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-caption text-muted-foreground">
+                الحدث:{" "}
+                <Link
+                  href={`/events/${t.eventId}`}
+                  className="font-medium text-dead-sea underline-offset-2 hover:underline"
+                >
+                  {t.eventTitle}
+                </Link>
+                {assignment ? ` · مسند إلى ${assignment.volunteer.name}` : " · غير مسند"}
+              </p>
+            </div>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/events/${t.eventId}`}>إدارة</Link>
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  highlight,
+async function VolunteerView({
+  userId,
+  name,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  highlight?: boolean;
+  userId: string;
+  name: string | null | undefined;
 }) {
+  const [activities, preferred, profile] = await Promise.all([
+    getVolunteerActivities(userId),
+    getPreferredCity(userId),
+    db.user.findUnique({
+      where: { id: userId },
+      select: { email: true, createdAt: true },
+    }),
+  ]);
+
+  const upcoming = activities.upcoming;
+
   return (
-    <div className={`rounded-lg border bg-card p-4 ${highlight ? "border-amber-500/40" : ""}`}>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Icon className="size-4" />
-        {label}
-      </div>
-      <p className={`mt-1 text-2xl font-bold ${highlight ? "text-amber-700" : ""}`}>{value}</p>
+    <div className="space-y-8">
+      <WelcomeBanner
+        name={name}
+        role="VOLUNTEER"
+        subtitle={
+          profile?.createdAt
+            ? `أنت متطوع مسجل منذ ${dateFmt.format(profile.createdAt)}`
+            : "شكراً لانضمامك إلى مجتمع التطوع"
+        }
+      />
+
+      {/* Upcoming events */}
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-h2 font-semibold tracking-tight">الأحداث القادمة</h2>
+            <p className="mt-1 text-body text-muted-foreground">
+              مهامك في الأحداث القادمة
+            </p>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/events">تصفح الأحداث</Link>
+          </Button>
+        </div>
+
+        {upcoming.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {upcoming.map((a) => (
+              <EventCard
+                key={a.id}
+                id={a.task.event.id}
+                title={a.task.event.title}
+                city={a.task.event.city}
+                category={a.task.event.category}
+                startsAt={a.task.event.startsAt}
+                organizerName={a.task.event.organizer.name}
+                slotsFilled={0}
+                slotsNeeded={a.task.requiredVolunteers}
+                status={a.task.event.status}
+                actions={
+                  <Button asChild size="sm">
+                    <Link href={`/events/${a.task.event.id}`}>الانضمام</Link>
+                  </Button>
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-card border border-dashed border-border p-12 text-center">
+            <p className="text-body text-muted-foreground">
+              لا توجد أحداث قادمة بعد — هناك من يحتاج يد المساعدة.
+            </p>
+            <Button className="mt-4" variant="outline" asChild>
+              <Link href="/events">تصفح الأحداث</Link>
+            </Button>
+          </div>
+        )}
+      </section>
+
+      {/* My tasks */}
+      <section>
+        <h2 className="mb-4 text-h2 font-semibold tracking-tight">مهامي</h2>
+        {upcoming.length > 0 || activities.past.length > 0 ? (
+          <ul className="space-y-3">
+            {[...upcoming, ...activities.past].map((a) => {
+              const badge = assignmentBadge[a.status as AssignmentStatus];
+              return (
+                <li
+                  key={a.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-card p-3 transition-colors hover:bg-gray-light"
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-body font-semibold">{a.task.title}</h3>
+                      {badge && (
+                        <span className={`rounded-full px-2 py-0.5 text-caption font-medium ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-caption text-muted-foreground">
+                      <Link
+                        href={`/events/${a.task.event.id}`}
+                        className="font-medium text-dead-sea underline-offset-2 hover:underline"
+                      >
+                        {a.task.event.title}
+                      </Link>
+                      {" · "}
+                      {formatDate(a.task.event.startsAt)}
+                    </p>
+                  </div>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={`/events/${a.task.event.id}`}>عرض الحدث</Link>
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="rounded-card border border-dashed border-border p-12 text-center">
+            <p className="text-body text-muted-foreground">
+              لا توجد مهام مسندة بعد. انضم إلى حدث لتبدأ.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* My profile */}
+      <section>
+        <h2 className="mb-4 text-h2 font-semibold tracking-tight">بياناتي</h2>
+        <RoleProfile
+          name={name}
+          email={profile?.email ?? null}
+          role="VOLUNTEER"
+          city={preferred?.preferredCity?.name ?? null}
+        />
+      </section>
     </div>
   );
 }

@@ -14,7 +14,7 @@ export default async function NewEventPage() {
   const cities = await getCitiesWithDistricts();
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10">
+    <div className="max-w-[42rem]">
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight">Create an event</h1>
         <p className="mt-1 text-muted-foreground">

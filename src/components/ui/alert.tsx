@@ -10,6 +10,18 @@ const alertVariants = cva(
         default: "bg-card text-card-foreground",
         destructive:
           "bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 [&>svg]:text-current",
+        // Semantic fills. Tinted bg + dark text (light) / gray-light (dark)
+        // is the only token pairing that clears 4.5:1 in BOTH modes: the
+        // hue-matched text these variants pair with their own tint measures
+        // 4.46:1 in light and ~2.2:1 in dark (both fail), so the hue is
+        // carried by the tinted fill + border instead of the text. Mirrors
+        // the warning variant; measured values in docs/UI_AUDIT.md.
+        success:
+          "bg-growth/15 text-slate-dark border-growth/30 *:data-[slot=alert-description]:text-slate-dark/90 [&>svg]:text-current dark:bg-growth/15 dark:text-gray-light dark:*:data-[slot=alert-description]:text-gray-light/90",
+        warning:
+          "bg-gold/20 text-slate-dark border-gold/40 *:data-[slot=alert-description]:text-slate-dark/90 [&>svg]:text-current dark:bg-gold/15 dark:text-gold dark:*:data-[slot=alert-description]:text-gold/90",
+        info:
+          "bg-dead-sea/10 text-slate-dark border-dead-sea/30 *:data-[slot=alert-description]:text-slate-dark/90 [&>svg]:text-current dark:bg-dead-sea/15 dark:text-gray-light dark:*:data-[slot=alert-description]:text-gray-light/90",
       },
     },
     defaultVariants: {

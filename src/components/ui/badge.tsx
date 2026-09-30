@@ -17,6 +17,14 @@ const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
+        // Semantic role/status types. Gold and gray take dark text for WCAG AA
+        // (white on either fill fails 4.5:1).
+        volunteer: "bg-dead-sea text-dead-sea-foreground",
+        organizer: "bg-gold text-gold-foreground",
+        event: "bg-growth text-growth-foreground",
+        pending: "bg-gray-light text-gray-dark",
+        completed: "bg-growth text-growth-foreground",
+        verified: "bg-dead-sea text-dead-sea-foreground",
       },
     },
     defaultVariants: {

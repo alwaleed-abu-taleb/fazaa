@@ -15,7 +15,7 @@ export default async function VerificationAdminPage() {
   const pending = await getPendingDocuments();
 
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-10">
+    <div className="max-w-[56rem]">
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Verification review</h1>
         <p className="mt-1 text-muted-foreground">

@@ -18,7 +18,7 @@ export default async function VerifyPage() {
   const canUpload = !status.isVerified && !status.hasPending;
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-10">
+    <div className="max-w-[42rem]">
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Verify your organization</h1>
         <p className="mt-1 text-muted-foreground">

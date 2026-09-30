@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    // Faz'aa's own logo lockups (master-mark.svg etc.) are served through
+    // next/image. They are first-party assets, so SVG rendering is safe here.
+    dangerouslyAllowSVG: true,
+  },
   experimental: {
     // Verification documents can be up to 10 MB — server actions cap at 1 MB by default.
     serverActions: {

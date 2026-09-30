@@ -71,6 +71,7 @@ model User {
   updatedAt    DateTime @updatedAt @db.Timestamptz(6)
 
   organizerProfile OrganizerProfile?
+  notifications    Notification[]
   organizedEvents  Event[]           @relation("EventOrganizer")
   assignments      TaskAssignment[]
   verificationDocuments VerificationDocument[] @relation("VerificationDocuments")
@@ -90,6 +91,22 @@ model OrganizerProfile {
   isVerified Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// In-app notifications (task assignments approved/cancelled, event updates…).
+// `read` is a plain flag so the unread badge is a cheap indexed count.
+model Notification {
+  id        String   @id @default(uuid(7))
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  @@index([userId, read]) // unread badge + "my notifications" list
 }
 
 model Event {

@@ -1,17 +1,18 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "@/features/theme/ThemeProvider";
-import "./globals.css";
+// Design tokens (CSS variables) + base/global styles — Arabic-first system
+// font stack, so no next/font faces are loaded here.
+import "./styles/globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Mobile browser chrome matches the page background in light/dark so the
+// status-bar area doesn't flash white in dark mode (values mirror the
+// --background token in globals.css).
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
+  ],
+};
 
 export const metadata: Metadata = {
   title: {
@@ -40,7 +41,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-svh bg-background text-foreground`}
+        className="antialiased min-h-svh bg-background text-foreground"
       >
         <script dangerouslySetInnerHTML={{ __html: noFlashThemeScript }} />
         <ThemeProvider>{children}</ThemeProvider>

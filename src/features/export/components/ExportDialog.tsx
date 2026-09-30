@@ -123,7 +123,7 @@ export function ExportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-[32rem]">
         <DialogHeader>
           <DialogTitle>Export volunteer roster</DialogTitle>
           <DialogDescription>
