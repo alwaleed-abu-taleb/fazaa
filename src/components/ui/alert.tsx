@@ -15,7 +15,7 @@ const alertVariants = cva(
         // hue-matched text these variants pair with their own tint measures
         // 4.46:1 in light and ~2.2:1 in dark (both fail), so the hue is
         // carried by the tinted fill + border instead of the text. Mirrors
-        // the warning variant; measured values in docs/UI_AUDIT.md.
+        // the warning variant.
         success:
           "bg-growth/15 text-slate-dark border-growth/30 *:data-[slot=alert-description]:text-slate-dark/90 [&>svg]:text-current dark:bg-growth/15 dark:text-gray-light dark:*:data-[slot=alert-description]:text-gray-light/90",
         warning:

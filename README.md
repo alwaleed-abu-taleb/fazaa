@@ -1,128 +1,142 @@
-# Faza — فزعة
+# Fazaa (فزعة)
 
-A community volunteering platform. Volunteers browse events and say **"I'm ready"** (instant
-claim) or **apply** (organizer approval); organizers post events, break them into tasks with slot
-capacities, track sign-ups live, export rosters, and earn a verification badge after an admin
-reviews their NGO license or ID.
+A full-stack community volunteering platform built with **Next.js 15**, **TypeScript**, **Prisma**, and **PostgreSQL (Supabase)**. Volunteers discover local events and claim open slots in one click or submit an application for organizer review; organizers structure events into capacity-limited tasks, track live sign-ups, verify their organization, and export volunteer rosters to CSV or styled Excel.
 
-## Features
+---
 
-- **Auth & roles** — Auth.js v5 (Credentials + bcrypt, JWT sessions); VOLUNTEER / ORGANIZER / ADMIN
-- **Events & tasks** — draft → publish lifecycle, per-task capacity, publish gated on verification
-- **Sign-ups** — instant claim or apply-for-approval; `SELECT … FOR UPDATE` row locks make
-  concurrent claims overbook-proof; live slot counts (2s polling + focus refresh) with optimistic
-  UI, toasts and "someone beat you to it" handling
-- **Organizer dashboard** — per-event tracker: fill rates, pending-approval inbox, rosters with
-  contact details, publish/cancel, **CSV & Excel roster export** (papaparse / SheetJS)
-- **Verification** — document upload (JPEG/PNG/PDF ≤ 10 MB, UploadThing in production, local-disk
-  fallback in dev), admin review queue, blue checkmark badge on profiles & event cards
-- **Dark mode** — class-based theme with no-flash boot script, persisted + system preference
-  fallback, dark-correct dropdowns/popovers
+## Architecture
 
-## Stack
-
-- **Next.js 15** (App Router, Server Actions, Turbopack) + **React 19**
-- **Auth.js v5** (`next-auth@beta`) · **Prisma 5** · **PostgreSQL (Supabase)**
-- **Tailwind CSS v4** + **shadcn/ui** (new-york, emerald brand) · **zod** (shared client/server)
-- **papaparse** + **xlsx-js-style** (roster exports) · **sonner** (toasts) · **uploadthing** (docs)
-
-## Project layout
-
+```mermaid
+flowchart LR
+  Browser["Browser (Next.js App Router + React 19)"] --> Edge["Edge Middleware (Auth.js v5 JWT Gate)"]
+  Edge --> Actions["Server Actions & REST API (Zod + RBAC)"]
+  Actions --> Prisma["Prisma ORM (PgBouncer Pooler)"]
+  Prisma --> Postgres["PostgreSQL / Supabase (FOR UPDATE Row Locks)"]
+  Actions --> Storage["Verification Docs (UploadThing / Auth-Gated Local API)"]
 ```
+
+- **Auth boundary:** `src/middleware.ts` imports the Edge-safe `src/server/auth.config.ts` to protect routes at the edge without loading Prisma or `bcryptjs`. Every Server Action and API route independently re-verifies the user session, role (`VOLUNTEER`, `ORGANIZER`, `ADMIN`), and resource ownership.
+- **Overbooking-proof capacity:** Task capacity is never stored as a mutable counter column. Filled slots are computed from `COUNT(TaskAssignment WHERE status = 'CONFIRMED')`. Both instant claims (`claimTask`) and organizer approvals (`approveAssignment`) run inside `db.$transaction` with `SELECT id FROM "Task" WHERE id = $1 FOR UPDATE`, serializing concurrent requests on the same task row.
+
+---
+
+## Key Features
+
+- **Role-Based Access Control (3 Roles):** Credentials authentication via Auth.js v5 (`bcryptjs` password hashing, JWT sessions) supporting `VOLUNTEER`, `ORGANIZER`, and `ADMIN` workflows.
+- **Event & Task Lifecycle:** Draft-to-published workflow gated on organizer verification, with Jordan governorate/district filtering (`City` and `District` models) and Arabic UI support.
+- **Dual Sign-Up Modes:**
+  - `INSTANT_CLAIM` — volunteers click **"I'm ready"** for immediate confirmation with row-locked capacity enforcement.
+  - `APPROVAL` — volunteers apply with an optional note; organizers approve or reject from their dashboard, with capacity re-checked at approval time.
+- **Live Slot Updates & Notifications:** 2-second task snapshot polling (`/api/realtime/tasks/[taskId]`) with optimistic UI and conflict handling, plus authenticated in-app notifications (`/api/notifications`).
+- **Organizer Verification:** Organizers upload NGO licenses or official IDs (JPEG/PNG/PDF up to 10 MB) to UploadThing in production or an auth-checked, path-traversal-safe local download endpoint (`/api/files/[key]`) in development. Admins approve or reject submissions to award the verified badge.
+- **Roster Exports:** Organizers download UTF-8 BOM CSV (`papaparse`) and styled Excel (`xlsx-js-style`) volunteer rosters directly from each event tracker.
+- **Dark Mode & Security Headers:** No-flash class-based dark mode with system fallback, plus `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and `Permissions-Policy` configured in `next.config.ts`.
+
+---
+
+## Tech Stack
+
+| Layer | Technologies |
+| :--- | :--- |
+| **Frontend** | Next.js 15 (App Router, Turbopack), React 19, TypeScript, Tailwind CSS v4, shadcn/ui (Radix UI), Lucide, Sonner |
+| **Backend** | Next.js Server Actions, Next.js Route Handlers (`/api/*`), Zod v4 |
+| **Auth & Security** | Auth.js v5 (`next-auth@beta`), `bcryptjs`, Edge Middleware + Server-Side RBAC |
+| **Database** | PostgreSQL (Supabase), Prisma 5 (`DATABASE_URL` transaction pooler + `DIRECT_DATABASE_URL` migrations), UUIDv7 PKs |
+| **Exports & Uploads** | `papaparse`, `xlsx-js-style`, UploadThing |
+
+---
+
+## Project Structure
+
+```text
+prisma/
+├─ schema.prisma              # 9 relational models (User, Event, Task, TaskAssignment, City, District, ...)
+├─ migrations/                # SQL migration history
+├─ seed.ts                    # Demo users, events, tasks, and sign-ups
+└─ seed-locations.ts          # Jordan 12 governorates and districts
+
 src/
-├─ app/                    # routing only
-│  ├─ (marketing)/         # public landing → featured events
-│  ├─ (auth)/login|register/
-│  ├─ (app)/               # authenticated shell (top nav)
-│  │  ├─ events/           # browse · new · [eventId]
-│  │  ├─ dashboard/        # role-aware · events/[eventId] tracker · verification (admin)
-│  │  ├─ verify/           # organizer document upload
-│  │  └─ profile/
-│  └─ api/                 # auth handlers · realtime task snapshots · file downloads
-├─ features/               # business logic, colocated per domain
-│  ├─ auth/ events/ tasks/ dashboard/ realtime/ verification/ export/ theme/
-├─ components/ui/          # shadcn primitives — don't hand-edit (except theme tweaks)
-├─ server/                 # db.ts (Prisma singleton) · auth.ts · auth.config.ts · errors.ts
-├─ lib/                    # utils.ts · format.ts
-├─ middleware.ts           # edge auth gate (UX only — actions re-check roles)
-└─ types/next-auth.d.ts
+├─ app/
+│  ├─ (marketing)/            # Public landing page and featured events
+│  ├─ (auth)/                 # Login, register, forgot-password
+│  ├─ (app)/                  # Authenticated shell: events, dashboard, verify, profile
+│  └─ api/                    # Auth.js, register, notifications, realtime task snapshots, file downloads
+├─ features/                  # Domain-colocated actions, Zod schemas, queries, and components
+│  └─ auth/ dashboard/ events/ export/ locations/ realtime/ tasks/ theme/ verification/
+├─ components/                # Shared UI primitives (shadcn/ui), notifications dropdown, theme toggle
+├─ server/                    # db.ts (Prisma singleton), auth.ts, auth.config.ts, errors.ts
+├─ lib/                       # Formatting and utility helpers
+└─ middleware.ts              # Edge route protection
 ```
 
-Conventions: every `actions.ts` starts with `"use server"`, zod-validates its input (schemas live
-in the same feature folder and are shared client/server), and re-checks the session role before
-touching data — middleware is a UX gate, never the real authorization. Prisma types never cross
-into client components; actions return plain mapped objects.
+---
 
-## Capacity model (the important part)
+## Getting Started
 
-A task's capacity lives in the **signup rows**, not in a counter column. Filled slots are
-`COUNT(TaskAssignment WHERE status = 'CONFIRMED')`. The claim action serializes concurrent claims
-with `SELECT … FOR UPDATE` on the task row inside a transaction, then counts and inserts — so two
-volunteers clicking at the same millisecond can never overbook a task. Approval-mode tasks
-re-check capacity at approval time, not at apply time.
+### Prerequisites
+- Node.js 20+
+- PostgreSQL database (Supabase or local Postgres)
 
-## Getting started
+### 1. Install dependencies
+```bash
+npm install
+```
 
-1. **Install** — `npm install`
-2. **Database** — create a Supabase project (or any Postgres) and fill `.env`:
+### 2. Configure environment variables
+Copy `.env.example` to `.env` and fill in your values:
+```bash
+cp .env.example .env
+```
 
-   ```
-   # runtime — transaction pooler (PgBouncer): pgbouncer=true is required
-   DATABASE_URL="postgresql://…@…pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=5"
-   # migrations — session pooler (or direct connection)
-   DIRECT_DATABASE_URL="postgresql://…@…pooler.supabase.com:5432/postgres"
-   # Auth.js v5 secret (this is the v5 name; v4 called it NEXTAUTH_SECRET)
-   # generate with: openssl rand -base64 32
-   AUTH_SECRET="…"
-   # optional — verification uploads use UploadThing when set, local .uploads/ when not
-   UPLOADTHING_TOKEN="…"
-   ```
+| Variable | Required | Description |
+| :--- | :---: | :--- |
+| `DATABASE_URL` | Yes | Runtime Postgres connection (use Supabase transaction pooler with `?pgbouncer=true&connection_limit=5`) |
+| `DIRECT_DATABASE_URL` | Yes | Direct or session-pooler Postgres connection used by Prisma CLI migrations |
+| `AUTH_SECRET` | Yes | Auth.js v5 JWT secret (generate with `openssl rand -base64 32`) |
+| `UPLOADTHING_TOKEN` | No | UploadThing token for production document uploads (defaults to local `.uploads/` in dev) |
 
-   `directUrl` in `prisma/schema.prisma` routes CLI/migrations through `DIRECT_DATABASE_URL`
-   (session mode keeps prepared statements working), while the client uses the pooled
-   `DATABASE_URL`. `.env` and `.env.local` are both gitignored.
+### 3. Run migrations and seed demo data
+```bash
+npx prisma migrate dev
+npx prisma db seed
+```
 
-3. **Migrate & seed**
+### 4. Start the development server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000).
 
-   ```bash
-   npx prisma migrate dev     # apply migrations
-   npx prisma db seed         # demo admin, organizer, volunteers, events + sign-ups
-   ```
+### Demo Accounts (After Seeding)
 
-4. **Run** — `npm run dev` → http://localhost:3000
+| Email | Password | Role |
+| :--- | :--- | :--- |
+| `admin@fazaa.sa` | `password123` | `ADMIN` |
+| `organizer@fazaa.sa` | `password123` | `ORGANIZER` |
+| `volunteer@fazaa.sa` | `password123` | `VOLUNTEER` |
+| `sara@fazaa.sa` | `password123` | `VOLUNTEER` |
 
-### Demo accounts (after seeding)
-
-| Email                 | Password      | Role      |
-| --------------------- | ------------- | --------- |
-| `admin@fazaa.sa`      | `password123` | ADMIN     |
-| `organizer@fazaa.sa`  | `password123` | ORGANIZER |
-| `volunteer@fazaa.sa`  | `password123` | VOLUNTEER |
-| `sara@fazaa.sa`       | `password123` | VOLUNTEER |
+---
 
 ## Scripts
 
-- `npm run dev` — dev server (Turbopack)
-- `npm run build` / `npm start` — production build/serve
-- `npm run lint` — ESLint
-- `npx prisma studio` — browse the database
+- `npm run dev` — Start Next.js dev server with Turbopack
+- `npm run build` — Generate Prisma Client and build production bundle
+- `npm start` — Run the production server
+- `npm run lint` — Run ESLint
+- `npx prisma studio` — Inspect database tables in the browser
 
-## Notes for production
+---
 
-- On serverless hosts (e.g. Vercel), keep the runtime `DATABASE_URL` on the transaction pooler
-  with `?pgbouncer=true&connection_limit=1`.
-- Rotate `AUTH_SECRET` (the committed dev value is rotated already, but treat it as a secret).
-- **UploadThing documents**: when `UPLOADTHING_TOKEN` is set, verification files go to UT's CDN —
-  configure the upload route to private/signed access, since ID documents are sensitive. The local
-  fallback serves files through an auth-checked route (owner or admin only).
-- Security headers (`X-Frame-Options`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`) are set
-  in `next.config.ts`.
-- The migration enables **RLS on every table with no policies**: the app reaches Postgres only
-  through Prisma as the table owner, so Supabase's Data API surface stays locked down.
-- Live slot counts use 2-second polling — swap in Supabase Realtime channels when scaling beyond
-  a few hundred concurrent viewers.
-- **Attended / Hours Worked** in exports are derived (status + task window); add attendance
-  tracking to make them first-class.
-- Display timezone is fixed to `Asia/Riyadh` for SSR consistency (`src/lib/format.ts`).
-- Roadmap candidates: event-level RSVP, notifications (email/WhatsApp), volunteer hours & badges,
-  Arabic RTL UI, Supabase Realtime channels.
+## Production Notes
+
+- **Serverless pooling:** On Vercel or other serverless hosts, keep `DATABASE_URL` on the transaction pooler with `?pgbouncer=true&connection_limit=1` and route migrations through `DIRECT_DATABASE_URL`.
+- **Secrets:** Generate a unique `AUTH_SECRET` per environment (`openssl rand -base64 32`).
+- **Document storage:** When `UPLOADTHING_TOKEN` is enabled in production, configure private/signed access for verification documents. Local development serves files through `/api/files/[key]` with strict owner-or-admin checks.
+- **Database surface:** Migrations enable Row-Level Security (RLS) on tables without public Data API policies, keeping database access scoped to the server-side Prisma client.
+
+---
+
+## License
+
+MIT License — see [LICENSE](LICENSE).
